@@ -43,7 +43,8 @@
   --chart-3: 197 37% 28%;
   --chart-4: 280 65% 30%;
   --chart-5: 43 74% 35%;
-  --font-sans: Open Sans, sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: .5rem;

@@ -1,0 +1,174 @@
+You are a senior full-stack engineer.
+
+Build a production-ready, multi-tenant web application for Bangladeshi traders.
+The app will be SELF-HOSTED on my own server using COOLIFY.
+
+==============================
+CORE CONCEPT
+==============================
+This is a Shopify-like micro-store builder focused on 1–10 products per store.
+
+Each tenant (trader) can:
+- Sign up
+- Create a store
+- Get an automatic subdomain:
+  storename.mydomain.com
+- Add products
+- Publish high-converting product landing pages
+- Accept CASH ON DELIVERY orders via a SIMPLE ON-PAGE checkout
+- Configure shipping fees (Inside Dhaka / Outside Dhaka / custom)
+- Track orders and basic analytics
+- Add Facebook Pixel and Google Tag Manager
+
+There is also a MAIN ADMIN who controls plans, limits, and tenants.
+
+==============================
+TECH STACK (MANDATORY)
+==============================
+- Frontend: Next.js (App Router)
+- Backend: Node.js with Express (inside Next.js or separate API)
+- Database: PostgreSQL
+- ORM: Prisma
+- Auth: Email + Password (sessions, not JWT)
+- Email: SMTP (configurable)
+- Hosting: Coolify
+- Subdomains: Wildcard DNS (*.mydomain.com)
+
+==============================
+DOMAIN & ROUTING RULES (CRITICAL)
+==============================
+- app.mydomain.com → dashboard (tenant + admin)
+- api.mydomain.com → backend API
+- storename.mydomain.com → public storefront
+- Product URL:
+  storename.mydomain.com/product-slug
+
+Resolve tenant STRICTLY from the HTTP Host header.
+Never trust the frontend for tenant identification.
+
+==============================
+USER ROLES
+==============================
+1. Tenant (Trader)
+2. Main Admin (platform owner)
+
+==============================
+FEATURE REQUIREMENTS (MVP)
+==============================
+
+AUTH & ONBOARDING
+- Tenant signup/login
+- Create store (name, slug)
+- Validate unique store slug
+- Auto-generate subdomain
+
+STORE & PRODUCTS
+- Product CRUD
+- Product fields:
+  name, slug, price, images, description, status
+- Product landing page (mobile-first)
+
+CHECKOUT (VERY IMPORTANT)
+- On-page checkout (no redirect)
+- Fields:
+  name, phone, address
+- Quantity selector
+- Cash on Delivery ONLY
+- Shipping classes:
+  - Inside Dhaka
+  - Outside Dhaka
+  - Custom classes (tenant-defined)
+- Calculate total = price + shipping
+
+ORDERS
+- Create order
+- Order statuses:
+  New, Confirmed, Shipped, Delivered, Cancelled
+- Tenant can update order status
+- Email notification to tenant on new order
+
+TRACKING
+- Facebook Pixel ID (tenant setting)
+- Google Tag Manager ID (tenant setting)
+- Fire events:
+  PageView
+  ViewContent
+  InitiateCheckout
+  Purchase OR Lead (COD)
+
+TENANT DASHBOARD
+- Overview stats
+- Products management
+- Orders list & detail view
+- Shipping settings
+- Tracking settings
+- Store branding settings
+
+ADMIN PANEL
+- Admin login
+- View all tenants
+- Create plans/packages
+- Plan rules:
+  product limit
+  allow custom domain
+  allow tracking
+- Suspend/activate tenants
+
+PREMIUM FEATURE (GATED)
+- Custom domain support
+- Tenant adds domain
+- Verify CNAME
+- Route traffic correctly without adding domains to Coolify dynamically
+
+==============================
+DATABASE MODELS (REQUIRED)
+==============================
+User
+Tenant
+Plan
+Product
+Order
+ShippingClass
+StoreSettings
+DomainMapping
+
+All records MUST be linked to tenantId where applicable.
+
+==============================
+SECURITY REQUIREMENTS
+==============================
+- Password hashing
+- Rate-limit order creation endpoint
+- Input validation (especially phone + address)
+- Tenant data isolation enforced server-side
+
+==============================
+ENVIRONMENT VARIABLES
+==============================
+DATABASE_URL
+SESSION_SECRET
+APP_DOMAIN=mydomain.com
+ADMIN_SUBDOMAIN=app
+API_SUBDOMAIN=api
+SMTP_HOST
+SMTP_USER
+SMTP_PASS
+
+==============================
+DELIVERABLES
+==============================
+1. Folder structure
+2. Prisma schema
+3. Tenant resolution middleware
+4. Order creation API
+5. Checkout flow
+6. Admin + tenant dashboards (basic UI)
+7. Instructions to run locally and deploy on Coolify
+
+IMPORTANT:
+- Write clean, readable, production-quality code
+- Do NOT mock features — implement real logic
+- Assume this will go to production
+- Prioritize correctness over shortcuts
+
+Start by scaffolding the project, Prisma schema, and tenant resolution logic.

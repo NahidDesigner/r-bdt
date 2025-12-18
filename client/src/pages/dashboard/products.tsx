@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Package, Edit, Trash2, ExternalLink, Loader2, ImagePlus } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
+import { useAuth } from "@/lib/auth";
 
 const productFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -160,6 +161,8 @@ function ProductCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { user } = useAuth();
+  const tenantSlug = user?.tenant?.slug;
   const statusStyles: Record<string, string> = {
     active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
@@ -200,7 +203,7 @@ function ProductCard({
             <Trash2 className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" asChild className="ml-auto">
-            <a href={`/store/preview/${product.slug}`} target="_blank" rel="noopener noreferrer">
+            <a href={tenantSlug ? `/store/${tenantSlug}/${product.slug}` : `#`} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-4 w-4" />
             </a>
           </Button>

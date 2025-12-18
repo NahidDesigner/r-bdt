@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Search, MoreVertical, ExternalLink, Ban, CheckCircle } from "lucide-react";
+import { Users, Search, MoreVertical, ExternalLink, Ban, CheckCircle, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,9 @@ interface TenantWithPlan extends Tenant {
     products: number;
     orders: number;
   };
+  userEmail?: string;
+  contactEmail?: string;
+  phone?: string;
 }
 
 export default function TenantsPage() {
@@ -59,6 +62,17 @@ export default function TenantsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/tenants"] });
       toast({ title: "Plan updated", description: "Tenant plan has been changed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/tenants/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tenants"] });
+      toast({ title: "Tenant deleted", description: "The tenant has been removed." });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -124,6 +138,11 @@ export default function TenantsPage() {
               onUpdatePlan={(planId) =>
                 updatePlanMutation.mutate({ id: tenant.id, planId })
               }
+              onDelete={() => {
+                if (confirm(`Are you sure you want to delete "${tenant.name}"? This action cannot be undone.`)) {
+                  deleteMutation.mutate(tenant.id);
+                }
+              }}
             />
           ))}
         </div>
@@ -160,12 +179,14 @@ function TenantCard({
   onViewDetails,
   onUpdateStatus,
   onUpdatePlan,
+  onDelete,
 }: {
   tenant: TenantWithPlan;
   plans: Plan[];
   onViewDetails: () => void;
   onUpdateStatus: (status: string) => void;
   onUpdatePlan: (planId: string) => void;
+  onDelete: () => void;
 }) {
   const statusStyles: Record<string, string> = {
     active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
@@ -245,6 +266,13 @@ function TenantCard({
                     Activate
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -276,6 +304,24 @@ function TenantDetails({
           <p className="text-sm text-muted-foreground">Store Slug</p>
           <p className="font-medium font-mono">{tenant.slug}</p>
         </div>
+        {tenant.userEmail && (
+          <div>
+            <p className="text-sm text-muted-foreground">Email</p>
+            <p className="font-medium">{tenant.userEmail}</p>
+          </div>
+        )}
+        {tenant.contactEmail && (
+          <div>
+            <p className="text-sm text-muted-foreground">Contact Email</p>
+            <p className="font-medium">{tenant.contactEmail}</p>
+          </div>
+        )}
+        {tenant.phone && (
+          <div>
+            <p className="text-sm text-muted-foreground">Phone</p>
+            <p className="font-medium">{tenant.phone}</p>
+          </div>
+        )}
         <div>
           <p className="text-sm text-muted-foreground">Created At</p>
           <p className="font-medium">{format(new Date(tenant.createdAt), "PPpp")}</p>

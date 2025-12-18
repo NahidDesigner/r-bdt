@@ -187,7 +187,15 @@ export const loginSchema = z.object({
 
 export const checkoutSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
-  phone: z.string().regex(/^01[3-9]\d{8}$/, "Invalid Bangladeshi phone number"),
+  phone: z.string().refine(
+    (val) => {
+      // Remove +880 prefix if present, then check if it's a valid Bangladeshi number
+      const cleaned = val.replace(/^\+880/, "").replace(/^880/, "").replace(/^0/, "");
+      // Should be 10 digits starting with 1, then 3-9
+      return /^1[3-9]\d{8}$/.test(cleaned);
+    },
+    { message: "Invalid Bangladeshi phone number. Use format: 01XXXXXXXXX or +8801XXXXXXXXX" }
+  ),
   address: z.string().min(10, "Please enter a complete address"),
   quantity: z.number().min(1, "Quantity must be at least 1"),
   shippingClassId: z.string().min(1, "Please select a shipping option"),

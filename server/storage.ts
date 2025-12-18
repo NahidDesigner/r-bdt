@@ -39,7 +39,8 @@ export interface IStorage {
   getTenantBySlug(slug: string): Promise<Tenant | undefined>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
   updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined>;
-  getAllTenants(): Promise<(Tenant & { plan?: Plan; _count?: { products: number; orders: number } })[]>;
+  deleteTenant(id: string): Promise<void>;
+  getAllTenants(): Promise<(Tenant & { plan?: Plan; _count?: { products: number; orders: number }; userEmail?: string; contactEmail?: string; phone?: string })[]>;
   checkSlugAvailability(slug: string): Promise<boolean>;
 
   // Plans
@@ -114,7 +115,15 @@ export class DatabaseStorage implements IStorage {
         },
       },
     });
-    return result;
+    if (!result) return undefined;
+    return {
+      ...result,
+      tenant: result.tenant ? {
+        ...result.tenant,
+        plan: result.tenant.plan || undefined,
+        storeSettings: result.tenant.storeSettings || undefined,
+      } : undefined,
+    };
   }
 
   async createUser(user: InsertUser): Promise<User> {
@@ -143,7 +152,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getAllTenants(): Promise<(Tenant & { plan?: Plan; _count?: { products: number; orders: number } })[]> {
+  async getAllTenants(): Promise<(Tenant & { plan?: Plan; _count?: { products: number; orders: number }; userEmail?: string; contactEmail?: string; phone?: string })[]> {
     const result = await db.query.tenants.findMany({
       with: { plan: true },
       orderBy: desc(tenants.createdAt),
@@ -159,17 +168,34 @@ export class DatabaseStorage implements IStorage {
           .select({ count: count() })
           .from(orders)
           .where(eq(orders.tenantId, tenant.id));
+        
+        // Get user email for this tenant
+        const [user] = await db.select().from(users).where(eq(users.tenantId, tenant.id)).limit(1);
+        
+        // Get store settings for contact email and phone
+        const storeSettings = await this.getStoreSettings(tenant.id);
+        
         return {
           ...tenant,
+          plan: tenant.plan || undefined,
           _count: {
             products: productCount?.count || 0,
             orders: orderCount?.count || 0,
           },
+          userEmail: user?.email,
+          contactEmail: storeSettings?.contactEmail || undefined,
+          phone: storeSettings?.whatsappNumber || undefined,
         };
       })
     );
 
     return tenantsWithCounts;
+  }
+
+  async deleteTenant(id: string): Promise<void> {
+    // Delete related data first (cascade deletes should handle most, but we'll be explicit)
+    await db.delete(users).where(eq(users.tenantId, id));
+    await db.delete(tenants).where(eq(tenants.id, id));
   }
 
   async checkSlugAvailability(slug: string): Promise<boolean> {

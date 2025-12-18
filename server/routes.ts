@@ -213,6 +213,14 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
+      // Check if tenant is suspended (only for tenant users)
+      if (user.role === "tenant" && user.tenantId) {
+        const tenant = await storage.getTenant(user.tenantId);
+        if (tenant && tenant.status === "suspended") {
+          return res.status(403).json({ message: "Your account has been suspended. Please contact support." });
+        }
+      }
+
       req.session.userId = user.id;
       
       // Explicitly save session before responding
@@ -600,6 +608,15 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update tenant plan" });
+    }
+  });
+
+  app.delete("/api/admin/tenants/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteTenant(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete tenant" });
     }
   });
 

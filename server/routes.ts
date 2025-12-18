@@ -148,7 +148,15 @@ export async function registerRoutes(
       });
 
       req.session.userId = user.id;
-      res.json({ success: true });
+      
+      // Explicitly save session before responding
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Registration failed" });
+        }
+        res.json({ success: true });
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -173,7 +181,15 @@ export async function registerRoutes(
       }
 
       req.session.userId = user.id;
-      res.json({ success: true });
+      
+      // Explicitly save session before responding
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.json({ success: true });
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });

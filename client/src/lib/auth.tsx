@@ -52,6 +52,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const error = await res.json();
       throw new Error(error.message || "Login failed");
     }
+    
+    // Wait a bit for session to be saved, then retry fetchUser if needed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Try to fetch user, with retry logic
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      try {
+        const userRes = await fetch("/api/auth/me", { credentials: "include" });
+        if (userRes.ok) {
+          const data = await userRes.json();
+          setUser(data.user);
+          return;
+        }
+        if (attempts < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        attempts++;
+      } catch (error) {
+        if (attempts < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        attempts++;
+      }
+    }
+    
+    // Final attempt
     await fetchUser();
   };
 
@@ -66,6 +94,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const error = await res.json();
       throw new Error(error.message || "Registration failed");
     }
+    
+    // Wait a bit for session to be saved, then retry fetchUser if needed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Try to fetch user, with retry logic
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      try {
+        const userRes = await fetch("/api/auth/me", { credentials: "include" });
+        if (userRes.ok) {
+          const data = await userRes.json();
+          setUser(data.user);
+          return;
+        }
+        if (attempts < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        attempts++;
+      } catch (error) {
+        if (attempts < maxAttempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        attempts++;
+      }
+    }
+    
+    // Final attempt
     await fetchUser();
   };
 

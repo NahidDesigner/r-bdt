@@ -79,6 +79,15 @@ export interface IStorage {
 
   // Admin Stats
   getAdminStats(): Promise<{ totalTenants: number; activeTenants: number; totalOrders: number; totalRevenue: string }>;
+
+  // Domain Mappings
+  getDomainMapping(id: string): Promise<DomainMapping | undefined>;
+  getDomainMappingByDomain(domain: string): Promise<DomainMapping | undefined>;
+  getDomainMappingsByTenant(tenantId: string): Promise<DomainMapping[]>;
+  createDomainMapping(mapping: InsertDomainMapping): Promise<DomainMapping>;
+  updateDomainMapping(id: string, data: Partial<InsertDomainMapping>): Promise<DomainMapping | undefined>;
+  deleteDomainMapping(id: string): Promise<void>;
+  getAllDomainMappings(): Promise<(DomainMapping & { tenant?: Tenant })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -342,6 +351,47 @@ export class DatabaseStorage implements IStorage {
       .toFixed(2);
 
     return { totalTenants, activeTenants, totalOrders, totalRevenue };
+  }
+
+  // Domain Mappings
+  async getDomainMapping(id: string): Promise<DomainMapping | undefined> {
+    const [mapping] = await db.select().from(domainMappings).where(eq(domainMappings.id, id));
+    return mapping;
+  }
+
+  async getDomainMappingByDomain(domain: string): Promise<DomainMapping | undefined> {
+    const [mapping] = await db.select().from(domainMappings).where(eq(domainMappings.domain, domain.toLowerCase()));
+    return mapping;
+  }
+
+  async getDomainMappingsByTenant(tenantId: string): Promise<DomainMapping[]> {
+    return db.select().from(domainMappings).where(eq(domainMappings.tenantId, tenantId));
+  }
+
+  async createDomainMapping(mapping: InsertDomainMapping): Promise<DomainMapping> {
+    const [newMapping] = await db.insert(domainMappings).values({
+      ...mapping,
+      domain: mapping.domain.toLowerCase(),
+    }).returning();
+    return newMapping;
+  }
+
+  async updateDomainMapping(id: string, data: Partial<InsertDomainMapping>): Promise<DomainMapping | undefined> {
+    const updateData = data.domain ? { ...data, domain: data.domain.toLowerCase() } : data;
+    const [updated] = await db.update(domainMappings).set(updateData).where(eq(domainMappings.id, id)).returning();
+    return updated;
+  }
+
+  async deleteDomainMapping(id: string): Promise<void> {
+    await db.delete(domainMappings).where(eq(domainMappings.id, id));
+  }
+
+  async getAllDomainMappings(): Promise<(DomainMapping & { tenant?: Tenant })[]> {
+    const result = await db.query.domainMappings.findMany({
+      with: { tenant: true },
+      orderBy: desc(domainMappings.createdAt),
+    });
+    return result;
   }
 }
 

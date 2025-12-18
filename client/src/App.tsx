@@ -15,9 +15,11 @@ import DashboardProducts from "@/pages/dashboard/products";
 import DashboardOrders from "@/pages/dashboard/orders";
 import DashboardShipping from "@/pages/dashboard/shipping";
 import DashboardSettings from "@/pages/dashboard/settings";
+import DashboardDomains from "@/pages/dashboard/domains";
 import AdminIndex from "@/pages/admin/index";
 import AdminTenants from "@/pages/admin/tenants";
 import AdminPlans from "@/pages/admin/plans";
+import AdminDomains from "@/pages/admin/domains";
 import ProductPage from "@/pages/store/product";
 import NotFound from "@/pages/not-found";
 
@@ -64,6 +66,7 @@ function TenantDashboardRoutes() {
           <Route path="/dashboard/orders" component={DashboardOrders} />
           <Route path="/dashboard/shipping" component={DashboardShipping} />
           <Route path="/dashboard/settings" component={DashboardSettings} />
+          <Route path="/dashboard/domains" component={DashboardDomains} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>
@@ -79,6 +82,7 @@ function AdminRoutes() {
           <Route path="/admin" component={AdminIndex} />
           <Route path="/admin/tenants" component={AdminTenants} />
           <Route path="/admin/plans" component={AdminPlans} />
+          <Route path="/admin/domains" component={AdminDomains} />
           <Route component={NotFound} />
         </Switch>
       </DashboardLayout>

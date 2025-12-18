@@ -180,11 +180,11 @@ function TenantCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h3 className="font-semibold">{tenant.name}</h3>
-              <Badge size="sm" className={statusStyles[tenant.status]}>
+              <Badge className={statusStyles[tenant.status]}>
                 {tenant.status}
               </Badge>
               {tenant.plan && (
-                <Badge size="sm" variant="outline">
+                <Badge variant="outline">
                   {tenant.plan.name}
                 </Badge>
               )}

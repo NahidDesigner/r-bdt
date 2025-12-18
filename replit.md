@@ -20,7 +20,7 @@ A production-ready multi-tenant e-commerce platform for Bangladeshi traders with
 - **Orders**: COD orders with customer info, shipping, status tracking
 - **ShippingClasses**: Location-based shipping rates
 - **StoreSettings**: FB Pixel, GTM, branding settings
-- **DomainMappings**: Custom domain support (future)
+- **DomainMappings**: Custom domain support with admin verification
 
 ### API Routes (server/routes.ts)
 - `/api/auth/*` - Authentication (login, register, logout, me)
@@ -31,12 +31,14 @@ A production-ready multi-tenant e-commerce platform for Bangladeshi traders with
 - `/api/store-settings` - Store branding/tracking
 - `/api/store/:slug/*` - Public storefront (COD checkout)
 - `/api/admin/*` - Admin operations (admin-protected)
+- `/api/domains/*` - Custom domain CRUD (tenant-protected)
+- `/api/admin/domains/*` - Domain verification/management (admin-protected)
 
 ### Frontend Pages
 - `/` - Landing page
 - `/login`, `/register` - Authentication
-- `/dashboard/*` - Tenant dashboard (products, orders, shipping, settings)
-- `/admin/*` - Admin panel (tenants, plans management)
+- `/dashboard/*` - Tenant dashboard (products, orders, shipping, domains, settings)
+- `/admin/*` - Admin panel (tenants, plans, domains management)
 - `/store/:storeSlug/:productSlug` - Public product landing pages
 
 ## Key Features
@@ -70,3 +72,6 @@ npm run db:push    # Push schema changes to database
 - Added rate limiting for auth and checkout endpoints
 - Implemented PostgreSQL session storage
 - Added Facebook Pixel & GTM tracking support
+- 2025-01: Added email notifications for new orders (nodemailer)
+- 2025-01: Added product image upload with object storage
+- 2025-01: Added custom domain support with tenant request and admin approval flow

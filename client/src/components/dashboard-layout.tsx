@@ -36,6 +36,7 @@ import {
   Users,
   CreditCard,
   BarChart3,
+  Globe,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -44,6 +45,7 @@ const tenantMenuItems = [
   { title: "Products", url: "/dashboard/products", icon: Package },
   { title: "Orders", url: "/dashboard/orders", icon: ShoppingCart },
   { title: "Shipping", url: "/dashboard/shipping", icon: Truck },
+  { title: "Domains", url: "/dashboard/domains", icon: Globe },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
@@ -51,6 +53,7 @@ const adminMenuItems = [
   { title: "Overview", url: "/admin", icon: BarChart3 },
   { title: "Tenants", url: "/admin/tenants", icon: Users },
   { title: "Plans", url: "/admin/plans", icon: CreditCard },
+  { title: "Domains", url: "/admin/domains", icon: Globe },
 ];
 
 interface DashboardLayoutProps {

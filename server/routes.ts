@@ -558,6 +558,125 @@ export async function registerRoutes(
     }
   });
 
+  // ========== Domain Mappings (Tenant) ==========
+  app.get("/api/domains", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const domains = await storage.getDomainMappingsByTenant(tenantId);
+      res.json(domains);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch domains" });
+    }
+  });
+
+  app.post("/api/domains", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const user = (req as any).user;
+
+      // Check if plan allows custom domains
+      if (!user.tenant?.plan?.allowCustomDomain) {
+        return res.status(403).json({ message: "Your plan does not support custom domains. Please upgrade." });
+      }
+
+      // Validate domain format
+      const domainInput = req.body.domain?.trim()?.toLowerCase();
+      if (!domainInput || domainInput.length < 4 || domainInput.length > 253) {
+        return res.status(400).json({ message: "Invalid domain name length" });
+      }
+
+      // Basic hostname validation - allows subdomains like shop.example.com
+      const hostnameRegex = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})+$/;
+      if (!hostnameRegex.test(domainInput)) {
+        return res.status(400).json({ message: "Invalid domain format. Use format like shop.yourdomain.com" });
+      }
+
+      // Check if domain already exists
+      const existing = await storage.getDomainMappingByDomain(domainInput);
+      if (existing) {
+        return res.status(400).json({ message: "This domain is already registered" });
+      }
+
+      const domain = await storage.createDomainMapping({
+        tenantId,
+        domain: domainInput,
+      });
+      res.json(domain);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add domain" });
+    }
+  });
+
+  app.delete("/api/domains/:id", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const domain = await storage.getDomainMapping(req.params.id);
+      
+      if (!domain || domain.tenantId !== tenantId) {
+        return res.status(404).json({ message: "Domain not found" });
+      }
+
+      await storage.deleteDomainMapping(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete domain" });
+    }
+  });
+
+  app.post("/api/domains/:id/verify", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const domain = await storage.getDomainMapping(req.params.id);
+      
+      if (!domain || domain.tenantId !== tenantId) {
+        return res.status(404).json({ message: "Domain not found" });
+      }
+
+      // In production, you would do DNS lookup to verify CNAME record points to your server
+      // For now, we'll just mark it as verified after admin approval
+      res.json({ message: "Verification request sent. Admin will review your domain." });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify domain" });
+    }
+  });
+
+  // ========== Domain Mappings (Admin) ==========
+  app.get("/api/admin/domains", requireAdmin, async (req, res) => {
+    try {
+      const domains = await storage.getAllDomainMappings();
+      res.json(domains);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch domains" });
+    }
+  });
+
+  app.patch("/api/admin/domains/:id/verify", requireAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateDomainMapping(req.params.id, { verified: true });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify domain" });
+    }
+  });
+
+  app.patch("/api/admin/domains/:id/unverify", requireAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateDomainMapping(req.params.id, { verified: false });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unverify domain" });
+    }
+  });
+
+  app.delete("/api/admin/domains/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteDomainMapping(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete domain" });
+    }
+  });
+
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
 

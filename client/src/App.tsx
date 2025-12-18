@@ -97,7 +97,9 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/store/:storeSlug/:productSlug" component={ProductPage} />
+      <Route path="/dashboard" component={TenantDashboardRoutes} />
       <Route path="/dashboard/:rest*" component={TenantDashboardRoutes} />
+      <Route path="/admin" component={AdminRoutes} />
       <Route path="/admin/:rest*" component={AdminRoutes} />
       <Route component={NotFound} />
     </Switch>

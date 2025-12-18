@@ -109,12 +109,24 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Store URL already taken" });
       }
 
-      const freePlan = (await storage.getActivePlans())[0];
+      let freePlan = (await storage.getActivePlans())[0];
+      
+      // Create a default free plan if none exists
+      if (!freePlan) {
+        freePlan = await storage.createPlan({
+          name: "Free",
+          productLimit: 5,
+          allowCustomDomain: false,
+          allowTracking: true,
+          price: "0",
+          isActive: true,
+        });
+      }
 
       const tenant = await storage.createTenant({
         name: data.storeName,
         slug: data.storeSlug,
-        planId: freePlan?.id || null,
+        planId: freePlan.id,
         status: "active",
       });
 

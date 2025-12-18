@@ -75,12 +75,31 @@ export async function registerRoutes(
     app.set("trust proxy", 1);
   }
 
+  // Create user_sessions table if it doesn't exist
+  // This fixes the issue where connect-pg-simple can't find table.sql in the dist folder
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        sid VARCHAR NOT NULL COLLATE "default",
+        sess JSON NOT NULL,
+        expire TIMESTAMP(6) NOT NULL,
+        CONSTRAINT "user_sessions_pkey" PRIMARY KEY ("sid")
+      )
+      WITH (OIDS=FALSE);
+      CREATE INDEX IF NOT EXISTS "IDX_user_sessions_expire" ON "user_sessions" ("expire");
+    `);
+    console.log("Session table created/verified successfully");
+  } catch (error) {
+    console.error("Error creating session table:", error);
+    // Continue anyway - the table might already exist
+  }
+
   app.use(
     session({
       store: new PgSession({
         pool,
         tableName: "user_sessions",
-        createTableIfMissing: true,
+        createTableIfMissing: false, // We create it manually above
       }),
       secret: process.env.SESSION_SECRET!,
       resave: false,

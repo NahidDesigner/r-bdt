@@ -288,6 +288,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/dashboard/analytics", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const period = (req.query.period as "7d" | "30d" | "90d" | "all") || "30d";
+      const analytics = await storage.getAnalytics(tenantId, period);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
   // ==================== PRODUCT ROUTES ====================
   app.get("/api/products", requireTenant, async (req, res) => {
     try {

@@ -11,6 +11,7 @@ import HomePage from "@/pages/home";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import DashboardIndex from "@/pages/dashboard/index";
+import DashboardAnalytics from "@/pages/dashboard/analytics";
 import DashboardProducts from "@/pages/dashboard/products";
 import DashboardOrders from "@/pages/dashboard/orders";
 import DashboardShipping from "@/pages/dashboard/shipping";
@@ -63,6 +64,7 @@ function TenantDashboardRoutes() {
       <DashboardLayout>
         <Switch>
           <Route path="/dashboard" component={DashboardIndex} />
+          <Route path="/dashboard/analytics" component={DashboardAnalytics} />
           <Route path="/dashboard/products" component={DashboardProducts} />
           <Route path="/dashboard/orders" component={DashboardOrders} />
           <Route path="/dashboard/shipping" component={DashboardShipping} />

@@ -66,6 +66,13 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
   getOrderStats(tenantId: string): Promise<{ totalOrders: number; newOrders: number; totalRevenue: string }>;
+  getAnalytics(tenantId: string, period?: "7d" | "30d" | "90d" | "all"): Promise<{
+    salesTrend: Array<{ date: string; revenue: number; orders: number }>;
+    orderStatusBreakdown: Array<{ status: string; count: number; revenue: number }>;
+    revenueTrend: Array<{ period: string; revenue: number; orders: number }>;
+    topProducts: Array<{ productId: string; productName: string; orders: number; revenue: number }>;
+    conversionRate: number;
+  }>;
 
   // Shipping Classes
   getShippingClass(id: string): Promise<ShippingClass | undefined>;
@@ -332,6 +339,134 @@ export class DatabaseStorage implements IStorage {
       .toFixed(2);
 
     return { totalOrders, newOrders, totalRevenue };
+  }
+
+  async getAnalytics(tenantId: string, period: "7d" | "30d" | "90d" | "all" = "30d"): Promise<{
+    salesTrend: Array<{ date: string; revenue: number; orders: number }>;
+    orderStatusBreakdown: Array<{ status: string; count: number; revenue: number }>;
+    revenueTrend: Array<{ period: string; revenue: number; orders: number }>;
+    topProducts: Array<{ productId: string; productName: string; orders: number; revenue: number }>;
+    conversionRate: number;
+  }> {
+    const allOrders = await db.select().from(orders).where(eq(orders.tenantId, tenantId));
+    
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate: Date;
+    switch (period) {
+      case "7d":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "30d":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case "90d":
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(0);
+    }
+    
+    const filteredOrders = allOrders.filter((o) => new Date(o.createdAt) >= startDate);
+    
+    // Sales Trend (daily)
+    const salesTrendMap = new Map<string, { revenue: number; orders: number }>();
+    filteredOrders.forEach((order) => {
+      const date = new Date(order.createdAt).toISOString().split("T")[0];
+      const existing = salesTrendMap.get(date) || { revenue: 0, orders: 0 };
+      salesTrendMap.set(date, {
+        revenue: existing.revenue + parseFloat(order.total),
+        orders: existing.orders + 1,
+      });
+    });
+    
+    const salesTrend = Array.from(salesTrendMap.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Order Status Breakdown
+    const statusMap = new Map<string, { count: number; revenue: number }>();
+    filteredOrders.forEach((order) => {
+      const existing = statusMap.get(order.status) || { count: 0, revenue: 0 };
+      statusMap.set(order.status, {
+        count: existing.count + 1,
+        revenue: existing.revenue + (order.status === "delivered" ? parseFloat(order.total) : 0),
+      });
+    });
+    
+    const orderStatusBreakdown = Array.from(statusMap.entries()).map(([status, data]) => ({
+      status,
+      ...data,
+    }));
+    
+    // Revenue Trend (weekly for 30d+, daily for 7d)
+    const revenueTrendMap = new Map<string, { revenue: number; orders: number }>();
+    filteredOrders.forEach((order) => {
+      const orderDate = new Date(order.createdAt);
+      let periodKey: string;
+      
+      if (period === "7d") {
+        periodKey = orderDate.toISOString().split("T")[0];
+      } else {
+        // Weekly grouping
+        const weekStart = new Date(orderDate);
+        weekStart.setDate(orderDate.getDate() - orderDate.getDay());
+        periodKey = weekStart.toISOString().split("T")[0];
+      }
+      
+      const existing = revenueTrendMap.get(periodKey) || { revenue: 0, orders: 0 };
+      revenueTrendMap.set(periodKey, {
+        revenue: existing.revenue + parseFloat(order.total),
+        orders: existing.orders + 1,
+      });
+    });
+    
+    const revenueTrend = Array.from(revenueTrendMap.entries())
+      .map(([period, data]) => ({ period, ...data }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+    
+    // Top Products
+    const productMap = new Map<string, { productName: string; orders: number; revenue: number }>();
+    const productIds = new Set(filteredOrders.map((o) => o.productId));
+    const productList = await db
+      .select()
+      .from(products)
+      .where(eq(products.tenantId, tenantId));
+    
+    const productNameMap = new Map(productList.map((p) => [p.id, p.name]));
+    
+    filteredOrders.forEach((order) => {
+      const productName = productNameMap.get(order.productId) || "Unknown Product";
+      const existing = productMap.get(order.productId) || {
+        productName,
+        orders: 0,
+        revenue: 0,
+      };
+      productMap.set(order.productId, {
+        productName,
+        orders: existing.orders + 1,
+        revenue: existing.revenue + parseFloat(order.total),
+      });
+    });
+    
+    const topProducts = Array.from(productMap.entries())
+      .map(([productId, data]) => ({ productId, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+    
+    // Conversion Rate (orders / total products viewed - simplified as orders / total orders for now)
+    // In a real scenario, you'd track product views separately
+    const totalOrders = filteredOrders.length;
+    const deliveredOrders = filteredOrders.filter((o) => o.status === "delivered").length;
+    const conversionRate = totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0;
+    
+    return {
+      salesTrend,
+      orderStatusBreakdown,
+      revenueTrend,
+      topProducts,
+      conversionRate: Math.round(conversionRate * 100) / 100,
+    };
   }
 
   // Shipping Classes

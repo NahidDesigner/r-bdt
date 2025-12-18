@@ -42,6 +42,7 @@ import type { ReactNode } from "react";
 
 const tenantMenuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
   { title: "Products", url: "/dashboard/products", icon: Package },
   { title: "Orders", url: "/dashboard/orders", icon: ShoppingCart },
   { title: "Shipping", url: "/dashboard/shipping", icon: Truck },

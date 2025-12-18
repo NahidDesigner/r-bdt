@@ -56,9 +56,15 @@ export function registerObjectStorageRoutes(app: Express): void {
         // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating upload URL:", error);
-      res.status(500).json({ error: "Failed to generate upload URL" });
+      const errorMessage = error?.message || "Failed to generate upload URL";
+      res.status(500).json({ 
+        error: errorMessage,
+        hint: process.env.STORAGE_TYPE === "s3" 
+          ? "Make sure S3_BUCKET, S3_ACCESS_KEY_ID, and S3_SECRET_ACCESS_KEY are set"
+          : "Make sure storage is configured correctly"
+      });
     }
   });
 
@@ -83,4 +89,3 @@ export function registerObjectStorageRoutes(app: Express): void {
     }
   });
 }
-

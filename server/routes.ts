@@ -616,7 +616,9 @@ export async function registerRoutes(
       await storage.deleteTenant(req.params.id);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete tenant" });
+      console.error("Delete tenant error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to delete tenant", error: errorMessage });
     }
   });
 

@@ -193,8 +193,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTenant(id: string): Promise<void> {
-    // Delete related data first (cascade deletes should handle most, but we'll be explicit)
+    // Delete related data in correct order to avoid foreign key constraint violations
+    // 1. Orders (must be deleted before products and shipping classes)
+    await db.delete(orders).where(eq(orders.tenantId, id));
+    
+    // 2. Products (referenced by orders)
+    await db.delete(products).where(eq(products.tenantId, id));
+    
+    // 3. Shipping Classes (referenced by orders)
+    await db.delete(shippingClasses).where(eq(shippingClasses.tenantId, id));
+    
+    // 4. Store Settings
+    await db.delete(storeSettings).where(eq(storeSettings.tenantId, id));
+    
+    // 5. Domain Mappings
+    await db.delete(domainMappings).where(eq(domainMappings.tenantId, id));
+    
+    // 6. Users
     await db.delete(users).where(eq(users.tenantId, id));
+    
+    // 7. Finally, delete the tenant itself
     await db.delete(tenants).where(eq(tenants.id, id));
   }
 

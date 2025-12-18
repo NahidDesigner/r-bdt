@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ShoppingCart, MapPin, Phone, User, Package, Loader2 } from "lucide-react";
+import { ShoppingCart, MapPin, Phone, User, Package, Loader2, Download, CheckSquare, Square } from "lucide-react";
 import { format } from "date-fns";
 
 const ORDER_STATUSES = ["new", "confirmed", "shipped", "delivered", "cancelled"] as const;
@@ -18,6 +19,7 @@ const ORDER_STATUSES = ["new", "confirmed", "shipped", "delivered", "cancelled"]
 export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const { data: orders, isLoading } = useQuery<Order[]>({
@@ -35,6 +37,53 @@ export default function OrdersPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: ({ orderIds, status }: { orderIds: string[]; status: string }) =>
+      apiRequest("PATCH", `/api/orders/bulk-status`, { orderIds, status }),
+    onSuccess: (data: { updatedCount: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      setSelectedOrderIds(new Set());
+      toast({ 
+        title: "Orders updated", 
+        description: `${data.updatedCount} order(s) status has been updated.` 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleBulkStatusUpdate = (status: string) => {
+    if (selectedOrderIds.size === 0) {
+      toast({ title: "No orders selected", description: "Please select at least one order.", variant: "destructive" });
+      return;
+    }
+    bulkUpdateMutation.mutate({ orderIds: Array.from(selectedOrderIds), status });
+  };
+
+  const handleExport = () => {
+    const url = `/api/orders/export?status=${statusFilter}`;
+    window.open(url, "_blank");
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.size === filteredOrders?.length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(filteredOrders?.map((o) => o.id) || []));
+    }
+  };
+
+  const toggleSelectOrder = (orderId: string) => {
+    const newSelected = new Set(selectedOrderIds);
+    if (newSelected.has(orderId)) {
+      newSelected.delete(orderId);
+    } else {
+      newSelected.add(orderId);
+    }
+    setSelectedOrderIds(newSelected);
+  };
 
   const filteredOrders = orders?.filter((order) =>
     statusFilter === "all" ? true : order.status === statusFilter
@@ -56,7 +105,7 @@ export default function OrdersPage() {
         <p className="text-muted-foreground mt-1">Manage customer orders and track deliveries</p>
       </div>
 
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+      <Tabs value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setSelectedOrderIds(new Set()); }}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="all" data-testid="tab-all">
             All ({orderCounts.all})
@@ -79,6 +128,57 @@ export default function OrdersPage() {
         </TabsList>
 
         <TabsContent value={statusFilter} className="mt-6">
+          {/* Bulk Actions Toolbar */}
+          {filteredOrders && filteredOrders.length > 0 && (
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <Checkbox
+                      checked={selectedOrderIds.size === filteredOrders.length && filteredOrders.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {selectedOrderIds.size > 0
+                        ? `${selectedOrderIds.size} order(s) selected`
+                        : "Select orders"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedOrderIds.size > 0 && (
+                      <>
+                        <Select
+                          value=""
+                          onValueChange={handleBulkStatusUpdate}
+                          disabled={bulkUpdateMutation.isPending}
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Update status..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ORDER_STATUSES.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                Mark as {status.charAt(0).toUpperCase() + status.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExport}
+                      disabled={isLoading}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -91,6 +191,8 @@ export default function OrdersPage() {
                 <OrderCard
                   key={order.id}
                   order={order}
+                  isSelected={selectedOrderIds.has(order.id)}
+                  onSelect={() => toggleSelectOrder(order.id)}
                   onViewDetails={() => setSelectedOrder(order)}
                   onUpdateStatus={(status) =>
                     updateStatusMutation.mutate({ id: order.id, status })
@@ -128,11 +230,15 @@ export default function OrdersPage() {
 
 function OrderCard({
   order,
+  isSelected,
+  onSelect,
   onViewDetails,
   onUpdateStatus,
   isUpdating,
 }: {
   order: Order;
+  isSelected: boolean;
+  onSelect: () => void;
   onViewDetails: () => void;
   onUpdateStatus: (status: string) => void;
   isUpdating: boolean;
@@ -146,10 +252,12 @@ function OrderCard({
   };
 
   return (
-    <Card data-testid={`order-card-${order.id}`}>
+    <Card data-testid={`order-card-${order.id}`} className={isSelected ? "ring-2 ring-primary" : ""}>
       <CardContent className="p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Checkbox checked={isSelected} onCheckedChange={onSelect} />
+            <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <span className="font-mono text-sm text-muted-foreground">
                 #{order.id.slice(0, 8)}
@@ -174,6 +282,7 @@ function OrderCard({
                 <Package className="h-4 w-4 text-muted-foreground" />
                 <span>Qty: {order.quantity}</span>
               </div>
+            </div>
             </div>
           </div>
           <div className="flex items-center gap-4">

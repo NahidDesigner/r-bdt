@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
 import {
   users,
   tenants,
@@ -65,6 +65,7 @@ export interface IStorage {
   getOrdersByTenant(tenantId: string): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
+  bulkUpdateOrderStatus(ids: string[], status: string, tenantId: string): Promise<number>;
   getOrderStats(tenantId: string): Promise<{ totalOrders: number; newOrders: number; totalRevenue: string }>;
   getAnalytics(tenantId: string, period?: "7d" | "30d" | "90d" | "all"): Promise<{
     salesTrend: Array<{ date: string; revenue: number; orders: number }>;
@@ -326,6 +327,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updated;
+  }
+
+  async bulkUpdateOrderStatus(ids: string[], status: string, tenantId: string): Promise<number> {
+    // Verify all orders belong to the tenant
+    const allOrders = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.tenantId, tenantId), inArray(orders.id, ids)));
+    
+    if (allOrders.length !== ids.length) {
+      throw new Error("Some orders not found or don't belong to tenant");
+    }
+
+    const result = await db
+      .update(orders)
+      .set({ status: status as any })
+      .where(and(eq(orders.tenantId, tenantId), inArray(orders.id, ids)))
+      .returning();
+    
+    return result.length;
   }
 
   async getOrderStats(tenantId: string): Promise<{ totalOrders: number; newOrders: number; totalRevenue: string }> {

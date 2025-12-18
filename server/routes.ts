@@ -388,6 +388,67 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/orders/bulk-status", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { orderIds, status } = req.body;
+
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        return res.status(400).json({ message: "Order IDs array is required" });
+      }
+
+      if (!status || !["new", "confirmed", "shipped", "delivered", "cancelled"].includes(status)) {
+        return res.status(400).json({ message: "Valid status is required" });
+      }
+
+      const updatedCount = await storage.bulkUpdateOrderStatus(orderIds, status, tenantId);
+      res.json({ success: true, updatedCount });
+    } catch (error) {
+      console.error("Bulk update error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ message: "Failed to update orders", error: errorMessage });
+    }
+  });
+
+  app.get("/api/orders/export", requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const statusFilter = req.query.status as string | undefined;
+      const orders = await storage.getOrdersByTenant(tenantId);
+      
+      const filteredOrders = statusFilter && statusFilter !== "all"
+        ? orders.filter((o) => o.status === statusFilter)
+        : orders;
+
+      // Generate CSV
+      const headers = ["Order ID", "Customer Name", "Phone", "Address", "Quantity", "Subtotal", "Shipping", "Total", "Status", "Created At"];
+      const rows = filteredOrders.map((order) => [
+        order.id,
+        order.customerName,
+        order.phone,
+        order.address.replace(/,/g, ";"), // Replace commas to avoid CSV issues
+        order.quantity.toString(),
+        order.subtotal,
+        order.shippingFee,
+        order.total,
+        order.status,
+        new Date(order.createdAt).toISOString(),
+      ]);
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="orders-${statusFilter || "all"}-${Date.now()}.csv"`);
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Export error:", error);
+      res.status(500).json({ message: "Failed to export orders" });
+    }
+  });
+
   // ==================== SHIPPING CLASS ROUTES ====================
   app.get("/api/shipping-classes", requireTenant, async (req, res) => {
     try {

@@ -8,6 +8,8 @@ import { z } from "zod";
 import { registerSchema, loginSchema, checkoutSchema } from "@shared/schema";
 import pgSession from "connect-pg-simple";
 import { pool } from "./db";
+import { sendNewOrderEmail } from "./email";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 const PgSession = pgSession(session);
 
@@ -451,6 +453,24 @@ export async function registerRoutes(
         status: "new",
       });
 
+      const storeSettings = await storage.getStoreSettings(tenant.id);
+      if (storeSettings?.contactEmail) {
+        sendNewOrderEmail({
+          tenantEmail: storeSettings.contactEmail,
+          tenantName: tenant.name,
+          orderNumber: order.id.slice(-8).toUpperCase(),
+          customerName: data.customerName,
+          customerPhone: data.phone,
+          customerAddress: data.address,
+          productName: product.name,
+          quantity: data.quantity,
+          subtotal: subtotal.toFixed(2),
+          shippingFee: shippingFee.toFixed(2),
+          total: total.toFixed(2),
+          shippingLocation: shippingClass.location,
+        }).catch(console.error);
+      }
+
       res.json(order);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -537,6 +557,9 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to delete plan" });
     }
   });
+
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
 
   return httpServer;
 }

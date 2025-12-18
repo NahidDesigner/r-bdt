@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Package, Edit, Trash2, ExternalLink, Loader2, ImagePlus } from "lucide-react";
+import { ImageUpload } from "@/components/ImageUpload";
 
 const productFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -183,7 +184,7 @@ function ProductCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="font-semibold truncate">{product.name}</h3>
-          <Badge size="sm" className={statusStyles[product.status]}>
+          <Badge className={statusStyles[product.status]}>
             {product.status}
           </Badge>
         </div>
@@ -312,6 +313,23 @@ function ProductForm({
                   rows={4}
                   data-testid="input-product-description"
                   {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="images"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Product Images</FormLabel>
+              <FormControl>
+                <ImageUpload
+                  images={field.value || []}
+                  onChange={field.onChange}
+                  maxImages={5}
                 />
               </FormControl>
               <FormMessage />

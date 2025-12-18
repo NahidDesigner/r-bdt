@@ -20,6 +20,7 @@ import AdminIndex from "@/pages/admin/index";
 import AdminTenants from "@/pages/admin/tenants";
 import AdminPlans from "@/pages/admin/plans";
 import AdminDomains from "@/pages/admin/domains";
+import StoreHomePage from "@/pages/store/index";
 import ProductPage from "@/pages/store/product";
 import NotFound from "@/pages/not-found";
 
@@ -97,6 +98,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/store/:storeSlug/:productSlug" component={ProductPage} />
+      <Route path="/store/:storeSlug" component={StoreHomePage} />
       <Route path="/dashboard" component={TenantDashboardRoutes} />
       <Route path="/dashboard/:rest*" component={TenantDashboardRoutes} />
       <Route path="/admin" component={AdminRoutes} />

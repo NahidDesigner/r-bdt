@@ -393,6 +393,29 @@ export async function registerRoutes(
   });
 
   // ==================== PUBLIC STORE ROUTES ====================
+  app.get("/api/store/:storeSlug", async (req, res) => {
+    try {
+      const { storeSlug } = req.params;
+
+      const tenant = await storage.getTenantBySlug(storeSlug);
+      if (!tenant || tenant.status !== "active") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+
+      const products = await storage.getProductsByTenant(tenant.id);
+      const activeProducts = products.filter((p) => p.status === "active");
+      const settings = await storage.getStoreSettings(tenant.id);
+
+      res.json({
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+        products: activeProducts,
+        settings,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch store data" });
+    }
+  });
+
   app.get("/api/store/:storeSlug/product/:productSlug", async (req, res) => {
     try {
       const { storeSlug, productSlug } = req.params;

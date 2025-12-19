@@ -50,9 +50,9 @@ export default function ProductsPage() {
   });
 
   // Fetch variants when editing a product
-  const { data: productVariants } = useQuery<ProductVariant[]>({
+  const { data: productVariants, isLoading: isLoadingVariants } = useQuery<ProductVariant[]>({
     queryKey: ["/api/products", editingProduct?.id, "variants"],
-    enabled: !!editingProduct?.id,
+    enabled: !!editingProduct?.id && isDialogOpen,
     queryFn: () => apiRequest("GET", `/api/products/${editingProduct?.id}/variants`),
   });
 
@@ -276,8 +276,17 @@ function ProductForm({
 
   // Sync variants when initialVariants change
   useEffect(() => {
-    setVariants(initialVariants);
+    setVariants(initialVariants || []);
   }, [initialVariants]);
+  
+  // Also sync when product changes
+  useEffect(() => {
+    if (product?.id) {
+      setVariants(initialVariants || []);
+    } else {
+      setVariants([]);
+    }
+  }, [product?.id, initialVariants]);
 
   const generateSlug = () => {
     if (name && !product) {

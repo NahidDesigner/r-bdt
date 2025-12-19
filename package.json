@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "tsx script/safe-db-push.ts",
+    "db:migrate-variants": "tsx script/migrate-variants.ts",
     "create-admin": "tsx script/create-admin.ts"
   },
   "dependencies": {

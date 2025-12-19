@@ -363,6 +363,90 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== PRODUCT VARIANT ROUTES ====================
+  app.get("/api/products/:productId/variants", requireTenant, async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.productId);
+      if (!product || product.tenantId !== (req as any).tenantId) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const variants = await storage.getProductVariants(req.params.productId);
+      res.json(variants);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch variants" });
+    }
+  });
+
+  app.post("/api/products/:productId/variants", requireTenant, async (req, res) => {
+    try {
+      const product = await storage.getProduct(req.params.productId);
+      if (!product || product.tenantId !== (req as any).tenantId) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const variant = await storage.createProductVariant({
+        ...req.body,
+        productId: req.params.productId,
+      });
+
+      // Update product to mark it as having variants
+      if (!product.hasVariants) {
+        await storage.updateProduct(req.params.productId, { hasVariants: true });
+      }
+
+      res.json(variant);
+    } catch (error) {
+      console.error("Create variant error:", error);
+      res.status(500).json({ message: "Failed to create variant" });
+    }
+  });
+
+  app.patch("/api/variants/:id", requireTenant, async (req, res) => {
+    try {
+      const variant = await storage.getProductVariant(req.params.id);
+      if (!variant) {
+        return res.status(404).json({ message: "Variant not found" });
+      }
+
+      const product = await storage.getProduct(variant.productId);
+      if (!product || product.tenantId !== (req as any).tenantId) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const updated = await storage.updateProductVariant(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update variant" });
+    }
+  });
+
+  app.delete("/api/variants/:id", requireTenant, async (req, res) => {
+    try {
+      const variant = await storage.getProductVariant(req.params.id);
+      if (!variant) {
+        return res.status(404).json({ message: "Variant not found" });
+      }
+
+      const product = await storage.getProduct(variant.productId);
+      if (!product || product.tenantId !== (req as any).tenantId) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      await storage.deleteProductVariant(req.params.id);
+
+      // Check if product still has variants, if not, update hasVariants flag
+      const remainingVariants = await storage.getProductVariants(variant.productId);
+      if (remainingVariants.length === 0) {
+        await storage.updateProduct(variant.productId, { hasVariants: false });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete variant" });
+    }
+  });
+
   // ==================== ORDER ROUTES ====================
   app.get("/api/orders", requireTenant, async (req, res) => {
     try {
@@ -565,10 +649,16 @@ export async function registerRoutes(
 
       const shippingClasses = await storage.getShippingClassesByTenant(tenant.id);
       const settings = await storage.getStoreSettings(tenant.id);
+      
+      // Get variants if product has them
+      const variants = product.hasVariants 
+        ? await storage.getProductVariants(product.id)
+        : [];
 
       res.json({
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
         product,
+        variants,
         shippingClasses,
         settings,
       });
@@ -592,18 +682,37 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Product not found" });
       }
 
+      // Get variant if provided
+      let variant = null;
+      let unitPrice = parseFloat(product.price);
+      
+      if (data.variantId) {
+        variant = await storage.getProductVariant(data.variantId);
+        if (!variant || variant.productId !== product.id) {
+          return res.status(400).json({ message: "Invalid variant" });
+        }
+        
+        // Check stock
+        if (variant.stock < data.quantity) {
+          return res.status(400).json({ message: "Insufficient stock for selected variant" });
+        }
+        
+        unitPrice = parseFloat(variant.price);
+      }
+
       const shippingClass = await storage.getShippingClass(data.shippingClassId);
       if (!shippingClass || shippingClass.tenantId !== tenant.id) {
         return res.status(400).json({ message: "Invalid shipping option" });
       }
 
-      const subtotal = parseFloat(product.price) * data.quantity;
+      const subtotal = unitPrice * data.quantity;
       const shippingFee = parseFloat(shippingClass.fee);
       const total = subtotal + shippingFee;
 
       const order = await storage.createOrder({
         tenantId: tenant.id,
         productId: product.id,
+        variantId: variant?.id || null,
         customerName: data.customerName,
         phone: data.phone,
         address: data.address,
@@ -614,6 +723,13 @@ export async function registerRoutes(
         total: total.toFixed(2),
         status: "new",
       });
+
+      // Update variant stock if variant was used
+      if (variant) {
+        await storage.updateProductVariant(variant.id, {
+          stock: variant.stock - data.quantity,
+        });
+      }
 
       const storeSettings = await storage.getStoreSettings(tenant.id);
       if (storeSettings?.contactEmail) {

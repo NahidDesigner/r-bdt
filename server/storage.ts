@@ -5,6 +5,7 @@ import {
   tenants,
   plans,
   products,
+  productVariants,
   orders,
   shippingClasses,
   storeSettings,
@@ -17,6 +18,8 @@ import {
   type InsertPlan,
   type Product,
   type InsertProduct,
+  type ProductVariant,
+  type InsertProductVariant,
   type Order,
   type InsertOrder,
   type ShippingClass,
@@ -290,6 +293,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteProduct(id: string): Promise<void> {
+    // Delete variants first (cascade should handle this, but being explicit)
+    await this.deleteProductVariants(id);
     await db.delete(products).where(eq(products.id, id));
   }
 
@@ -299,6 +304,38 @@ export class DatabaseStorage implements IStorage {
       .from(products)
       .where(eq(products.tenantId, tenantId));
     return result?.count || 0;
+  }
+
+  // Product Variants
+  async getProductVariants(productId: string): Promise<ProductVariant[]> {
+    return db
+      .select()
+      .from(productVariants)
+      .where(eq(productVariants.productId, productId))
+      .orderBy(desc(productVariants.isDefault), desc(productVariants.createdAt));
+  }
+
+  async getProductVariant(id: string): Promise<ProductVariant | undefined> {
+    const [variant] = await db.select().from(productVariants).where(eq(productVariants.id, id));
+    return variant;
+  }
+
+  async createProductVariant(variant: InsertProductVariant): Promise<ProductVariant> {
+    const [newVariant] = await db.insert(productVariants).values(variant).returning();
+    return newVariant;
+  }
+
+  async updateProductVariant(id: string, data: Partial<InsertProductVariant>): Promise<ProductVariant | undefined> {
+    const [updated] = await db.update(productVariants).set(data).where(eq(productVariants.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProductVariant(id: string): Promise<void> {
+    await db.delete(productVariants).where(eq(productVariants.id, id));
+  }
+
+  async deleteProductVariants(productId: string): Promise<void> {
+    await db.delete(productVariants).where(eq(productVariants.productId, productId));
   }
 
   // Orders

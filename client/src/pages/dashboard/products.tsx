@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Package, Edit, Trash2, ExternalLink, Loader2, ImagePlus } from "lucide-react";
+import { Plus, Package, Edit, Trash2, ExternalLink, Loader2, ImagePlus, X } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
 import { useAuth } from "@/lib/auth";
 
@@ -26,6 +26,16 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   status: z.enum(["active", "draft", "archived"]),
   images: z.array(z.string()).optional(),
+  hasVariants: z.boolean().optional(),
+});
+
+const variantFormSchema = z.object({
+  name: z.string().min(1, "Variant name is required"),
+  sku: z.string().optional(),
+  price: z.string().min(1, "Price is required"),
+  stock: z.number().min(0, "Stock must be 0 or greater"),
+  attributes: z.string().optional(), // JSON string for size, color, etc.
+  isDefault: z.boolean().optional(),
 });
 
 type ProductFormData = z.infer<typeof productFormSchema>;
@@ -114,6 +124,7 @@ export default function ProductsPage() {
             </DialogHeader>
             <ProductForm
               product={editingProduct}
+              variants={variants || []}
               onSubmit={(data) => {
                 if (editingProduct) {
                   updateMutation.mutate({ id: editingProduct.id, data });
@@ -215,15 +226,21 @@ function ProductCard({
 
 function ProductForm({
   product,
+  variants: initialVariants = [],
   onSubmit,
   isLoading,
   onCancel,
 }: {
   product: Product | null;
+  variants?: any[];
   onSubmit: (data: ProductFormData) => void;
   isLoading: boolean;
   onCancel: () => void;
 }) {
+  const [variants, setVariants] = useState<any[]>(initialVariants);
+  const [showVariantForm, setShowVariantForm] = useState(false);
+  const [editingVariant, setEditingVariant] = useState<any | null>(null);
+  const { toast } = useToast();
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -238,6 +255,25 @@ function ProductForm({
 
   const name = form.watch("name");
 
+  const variantForm = useForm<z.infer<typeof variantFormSchema>>({
+    resolver: zodResolver(variantFormSchema),
+    defaultValues: {
+      name: "",
+      sku: "",
+      price: "",
+      stock: 0,
+      attributes: "{}",
+      isDefault: false,
+    },
+  });
+
+  // Sync variants when initialVariants change
+  useEffect(() => {
+    if (initialVariants.length > 0) {
+      setVariants(initialVariants);
+    }
+  }, [initialVariants]);
+
   const generateSlug = () => {
     if (name && !product) {
       const slug = name
@@ -245,6 +281,62 @@ function ProductForm({
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
       form.setValue("slug", slug);
+    }
+  };
+
+  const handleAddVariant = async (variantData: z.infer<typeof variantFormSchema>) => {
+    if (!product?.id) {
+      toast({ title: "Error", description: "Please save the product first before adding variants", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/products/${product.id}/variants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...variantData,
+          attributes: variantData.attributes || "{}",
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to create variant");
+
+      const newVariant = await res.json();
+      setVariants([...variants, newVariant]);
+      variantForm.reset();
+      setShowVariantForm(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/products", product.id, "variants"] });
+      
+      // Update product to mark it as having variants
+      if (!product.hasVariants) {
+        await fetch(`/api/products/${product.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hasVariants: true }),
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      }
+      
+      toast({ title: "Variant added", description: "Product variant has been added successfully." });
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to add variant", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteVariant = async (variantId: string) => {
+    if (!product?.id) return;
+    if (!window.confirm("Are you sure you want to delete this variant?")) return;
+
+    try {
+      const res = await fetch(`/api/variants/${variantId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete variant");
+
+      setVariants(variants.filter((v) => v.id !== variantId));
+      queryClient.invalidateQueries({ queryKey: ["/api/products", product.id, "variants"] });
+      toast({ title: "Variant deleted", description: "Variant has been removed." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete variant", variant: "destructive" });
     }
   };
 
@@ -361,6 +453,181 @@ function ProductForm({
             </FormItem>
           )}
         />
+
+        {/* Variant Management - Only show for existing products */}
+        {product?.id && (
+          <div className="border-t pt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">Product Variants</h3>
+                <p className="text-sm text-muted-foreground">Add size, color, or other options</p>
+              </div>
+              {!showVariantForm && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowVariantForm(true);
+                    setEditingVariant(null);
+                    variantForm.reset();
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Variant
+                </Button>
+              )}
+            </div>
+
+            {showVariantForm && (
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">{editingVariant ? "Edit Variant" : "New Variant"}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowVariantForm(false);
+                        setEditingVariant(null);
+                        variantForm.reset();
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Form {...variantForm}>
+                    <form
+                      onSubmit={variantForm.handleSubmit(handleAddVariant)}
+                      className="space-y-3"
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={variantForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Variant Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Small - Red" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={variantForm.control}
+                          name="sku"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>SKU (Optional)</FormLabel>
+                              <FormControl>
+                                <Input placeholder="SKU-001" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={variantForm.control}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Price (BDT)</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="999" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={variantForm.control}
+                          name="stock"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Stock Quantity</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="0"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" size="sm" className="flex-1">
+                          {editingVariant ? "Update" : "Add"} Variant
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowVariantForm(false);
+                            setEditingVariant(null);
+                            variantForm.reset();
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            )}
+
+            {variants.length > 0 && (
+              <div className="space-y-2">
+                {variants.map((variant) => (
+                  <Card key={variant.id}>
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{variant.name}</span>
+                            {variant.isDefault && (
+                              <Badge variant="outline" className="text-xs">Default</Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            <span>Price: ৳{variant.price}</span>
+                            <span className="mx-2">•</span>
+                            <span>Stock: {variant.stock}</span>
+                            {variant.sku && (
+                              <>
+                                <span className="mx-2">•</span>
+                                <span>SKU: {variant.sku}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteVariant(variant.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
             Cancel

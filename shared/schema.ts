@@ -51,6 +51,20 @@ export const products = pgTable("products", {
   description: text("description"),
   images: text("images").array().notNull().default(sql`ARRAY[]::text[]`),
   status: productStatusEnum("status").notNull().default("draft"),
+  hasVariants: boolean("has_variants").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Product Variants table
+export const productVariants = pgTable("product_variants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g., "Small - Red", "Large - Blue"
+  sku: text("sku"), // Optional SKU
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(), // Variant-specific price
+  stock: integer("stock").notNull().default(0), // Stock quantity
+  attributes: text("attributes").notNull().default("{}"), // JSON string for size, color, etc.
+  isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -69,6 +83,7 @@ export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
   productId: varchar("product_id").notNull().references(() => products.id),
+  variantId: varchar("variant_id").references(() => productVariants.id), // Optional variant reference
   customerName: text("customer_name").notNull(),
   phone: text("phone").notNull(),
   address: text("address").notNull(),
@@ -124,6 +139,12 @@ export const usersRelations = relations(users, ({ one }) => ({
 export const productsRelations = relations(products, ({ one, many }) => ({
   tenant: one(tenants, { fields: [products.tenantId], references: [tenants.id] }),
   orders: many(orders),
+  variants: many(productVariants),
+}));
+
+export const productVariantsRelations = relations(productVariants, ({ one, many }) => ({
+  product: one(products, { fields: [productVariants.productId], references: [products.id] }),
+  orders: many(orders),
 }));
 
 export const shippingClassesRelations = relations(shippingClasses, ({ one }) => ({
@@ -133,6 +154,7 @@ export const shippingClassesRelations = relations(shippingClasses, ({ one }) => 
 export const ordersRelations = relations(orders, ({ one }) => ({
   tenant: one(tenants, { fields: [orders.tenantId], references: [tenants.id] }),
   product: one(products, { fields: [orders.productId], references: [products.id] }),
+  variant: one(productVariants, { fields: [orders.variantId], references: [productVariants.id] }),
   shippingClass: one(shippingClasses, { fields: [orders.shippingClassId], references: [shippingClasses.id] }),
 }));
 
@@ -149,6 +171,7 @@ export const insertPlanSchema = createInsertSchema(plans).omit({ id: true, creat
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
+export const insertProductVariantSchema = createInsertSchema(productVariants).omit({ id: true, createdAt: true });
 export const insertShippingClassSchema = createInsertSchema(shippingClasses).omit({ id: true });
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });
 export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit({ id: true });
@@ -163,6 +186,8 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type ProductVariant = typeof productVariants.$inferSelect;
+export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
 export type ShippingClass = typeof shippingClasses.$inferSelect;
 export type InsertShippingClass = z.infer<typeof insertShippingClassSchema>;
 export type Order = typeof orders.$inferSelect;
@@ -199,6 +224,7 @@ export const checkoutSchema = z.object({
   address: z.string().min(10, "Please enter a complete address"),
   quantity: z.number().min(1, "Quantity must be at least 1"),
   shippingClassId: z.string().min(1, "Please select a shipping option"),
+  variantId: z.string().optional(), // Optional variant ID
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

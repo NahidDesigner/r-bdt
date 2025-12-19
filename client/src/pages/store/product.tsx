@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +37,14 @@ interface StoreData {
     slug: string;
   };
   product: Product;
+  variants?: Array<{
+    id: string;
+    name: string;
+    price: string;
+    stock: number;
+    sku?: string | null;
+    isDefault: boolean;
+  }>;
   shippingClasses: ShippingClass[];
   settings: StoreSettings | null;
 }
@@ -44,6 +53,7 @@ export default function ProductPage() {
   const { storeSlug, productSlug } = useParams<{ storeSlug: string; productSlug: string }>();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
   const { data, isLoading, error } = useQuery<StoreData>({
@@ -63,6 +73,7 @@ export default function ProductPage() {
       address: "",
       quantity: 1,
       shippingClassId: "",
+      variantId: undefined,
     },
   });
 
@@ -78,6 +89,17 @@ export default function ProductPage() {
   useEffect(() => {
     form.setValue("quantity", quantity);
   }, [quantity, form]);
+
+  // Set default variant when variants load
+  useEffect(() => {
+    if (data?.variants && data.variants.length > 0) {
+      const defaultVariant = data.variants.find((v) => v.isDefault) || data.variants[0];
+      if (defaultVariant) {
+        setSelectedVariant(defaultVariant.id);
+        form.setValue("variantId", defaultVariant.id);
+      }
+    }
+  }, [data?.variants, form]);
 
   useEffect(() => {
     if (data?.settings?.fbPixelId) {
@@ -96,7 +118,15 @@ export default function ProductPage() {
     (sc) => sc.id === form.watch("shippingClassId")
   );
 
-  const subtotal = data?.product ? parseFloat(data.product.price) * quantity : 0;
+  // Get selected variant or use product price
+  const selectedVariantData = data?.variants?.find((v) => v.id === selectedVariant);
+  const unitPrice = selectedVariantData
+    ? parseFloat(selectedVariantData.price)
+    : data?.product
+    ? parseFloat(data.product.price)
+    : 0;
+
+  const subtotal = unitPrice * quantity;
   const shippingFee = selectedShippingClass ? parseFloat(selectedShippingClass.fee) : 0;
   const total = subtotal + shippingFee;
 
@@ -123,6 +153,21 @@ export default function ProductPage() {
 
   const onSubmit = (formData: CheckoutInput) => {
     if (!data?.product) return;
+
+    // Validate variant selection if product has variants
+    if (data?.variants && data.variants.length > 0 && !formData.variantId) {
+      toast({ title: "Please select a variant", variant: "destructive" });
+      return;
+    }
+
+    // Check stock if variant is selected
+    if (formData.variantId) {
+      const variant = data?.variants?.find((v) => v.id === formData.variantId);
+      if (variant && variant.stock < formData.quantity) {
+        toast({ title: "Insufficient stock", description: `Only ${variant.stock} available`, variant: "destructive" });
+        return;
+      }
+    }
 
     if (data?.settings?.fbPixelId) {
       trackFBEvent("InitiateCheckout", {
@@ -237,8 +282,19 @@ export default function ProductPage() {
                 {product.name}
               </h1>
               <p className="text-3xl font-bold text-primary mt-3" data-testid="text-product-price">
-                ৳{product.price}
+                ৳{unitPrice > 0 ? unitPrice.toFixed(2) : product.price}
               </p>
+              {selectedVariantData && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {selectedVariantData.name}
+                  {selectedVariantData.stock > 0 && (
+                    <span className="ml-2">({selectedVariantData.stock} in stock)</span>
+                  )}
+                  {selectedVariantData.stock === 0 && (
+                    <span className="ml-2 text-red-500">(Out of Stock)</span>
+                  )}
+                </p>
+              )}
             </div>
 
             {product.description && (
@@ -257,6 +313,50 @@ export default function ProductPage() {
               <CardContent>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {/* Variant Selection */}
+                    {data?.variants && data.variants.length > 0 && (
+                      <FormField
+                        control={form.control}
+                        name="variantId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Select Variant</FormLabel>
+                            <FormControl>
+                              <Select
+                                value={selectedVariant || ""}
+                                onValueChange={(value) => {
+                                  setSelectedVariant(value);
+                                  field.onChange(value);
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a variant" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {data.variants.map((variant) => (
+                                    <SelectItem
+                                      key={variant.id}
+                                      value={variant.id}
+                                      disabled={variant.stock === 0}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <span>{variant.name}</span>
+                                        <span className="ml-4 text-muted-foreground">
+                                          ৳{variant.price}
+                                          {variant.stock === 0 && " (Out of Stock)"}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
                     <div>
                       <Label className="text-sm font-medium mb-2 block">Quantity</Label>
                       <div className="flex items-center gap-3">

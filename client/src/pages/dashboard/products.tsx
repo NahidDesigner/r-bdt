@@ -291,10 +291,7 @@ function ProductForm({
     }
   };
 
-  const handleAddVariant = async (variantData: z.infer<typeof variantFormSchema>, e?: React.BaseSyntheticEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    
+  const handleAddVariant = async (variantData: z.infer<typeof variantFormSchema>) => {
     if (!product?.id) {
       toast({ title: "Error", description: "Please save the product first before adding variants", variant: "destructive" });
       return;
@@ -511,14 +508,7 @@ function ProductForm({
                     </Button>
                   </div>
                   <Form {...variantForm}>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        variantForm.handleSubmit(handleAddVariant)(e);
-                      }}
-                      className="space-y-3"
-                    >
+                    <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
                           control={variantForm.control}
@@ -581,7 +571,18 @@ function ProductForm({
                         />
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" size="sm" className="flex-1">
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={async () => {
+                            const isValid = await variantForm.trigger();
+                            if (isValid) {
+                              const data = variantForm.getValues();
+                              await handleAddVariant(data);
+                            }
+                          }}
+                        >
                           {editingVariant ? "Update" : "Add"} Variant
                         </Button>
                         <Button
@@ -597,7 +598,7 @@ function ProductForm({
                           Cancel
                         </Button>
                       </div>
-                    </form>
+                    </div>
                   </Form>
                 </CardContent>
               </Card>

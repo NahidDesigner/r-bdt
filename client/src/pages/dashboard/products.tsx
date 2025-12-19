@@ -4,7 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Product } from "@shared/schema";
+import type { Product, ProductVariant } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +47,13 @@ export default function ProductsPage() {
 
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
+  });
+
+  // Fetch variants when editing a product
+  const { data: productVariants } = useQuery<ProductVariant[]>({
+    queryKey: ["/api/products", editingProduct?.id, "variants"],
+    enabled: !!editingProduct?.id,
+    queryFn: () => apiRequest("GET", `/api/products/${editingProduct?.id}/variants`),
   });
 
   const createMutation = useMutation({
@@ -124,7 +131,7 @@ export default function ProductsPage() {
             </DialogHeader>
             <ProductForm
               product={editingProduct}
-              variants={variants || []}
+              variants={productVariants || []}
               onSubmit={(data) => {
                 if (editingProduct) {
                   updateMutation.mutate({ id: editingProduct.id, data });

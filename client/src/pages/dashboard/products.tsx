@@ -50,11 +50,18 @@ export default function ProductsPage() {
   });
 
   // Fetch variants when editing a product
-  const { data: productVariants, isLoading: isLoadingVariants } = useQuery<ProductVariant[]>({
+  const { data: productVariants, isLoading: isLoadingVariants, refetch: refetchVariants } = useQuery<ProductVariant[]>({
     queryKey: ["/api/products", editingProduct?.id, "variants"],
     enabled: !!editingProduct?.id && isDialogOpen,
     queryFn: () => apiRequest("GET", `/api/products/${editingProduct?.id}/variants`),
   });
+
+  // Refetch variants when dialog opens for editing
+  useEffect(() => {
+    if (isDialogOpen && editingProduct?.id) {
+      refetchVariants();
+    }
+  }, [isDialogOpen, editingProduct?.id, refetchVariants]);
 
   const createMutation = useMutation({
     mutationFn: (data: ProductFormData) => apiRequest("POST", "/api/products", data),
@@ -234,12 +241,14 @@ function ProductCard({
 function ProductForm({
   product,
   variants: initialVariants = [],
+  isLoadingVariants = false,
   onSubmit,
   isLoading,
   onCancel,
 }: {
   product: Product | null;
   variants?: any[];
+  isLoadingVariants?: boolean;
   onSubmit: (data: ProductFormData) => void;
   isLoading: boolean;
   onCancel: () => void;

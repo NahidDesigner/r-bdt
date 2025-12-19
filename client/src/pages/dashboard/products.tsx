@@ -292,6 +292,15 @@ function ProductForm({
       setVariants([]);
     }
   }, [product?.id, initialVariants]);
+  
+  // Debug: Log when variants change
+  useEffect(() => {
+    if (product?.id) {
+      console.log("ProductForm - Product ID:", product.id);
+      console.log("ProductForm - Initial Variants:", initialVariants);
+      console.log("ProductForm - Current Variants State:", variants);
+    }
+  }, [product?.id, initialVariants, variants]);
 
   const generateSlug = () => {
     if (name && !product) {

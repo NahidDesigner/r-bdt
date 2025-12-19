@@ -291,7 +291,10 @@ function ProductForm({
     }
   };
 
-  const handleAddVariant = async (variantData: z.infer<typeof variantFormSchema>) => {
+  const handleAddVariant = async (variantData: z.infer<typeof variantFormSchema>, e?: React.BaseSyntheticEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
     if (!product?.id) {
       toast({ title: "Error", description: "Please save the product first before adding variants", variant: "destructive" });
       return;
@@ -307,7 +310,10 @@ function ProductForm({
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create variant");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create variant");
+      }
 
       const newVariant = await res.json();
       setVariants([...variants, newVariant]);
@@ -506,7 +512,11 @@ function ProductForm({
                   </div>
                   <Form {...variantForm}>
                     <form
-                      onSubmit={variantForm.handleSubmit(handleAddVariant)}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        variantForm.handleSubmit(handleAddVariant)(e);
+                      }}
                       className="space-y-3"
                     >
                       <div className="grid grid-cols-2 gap-3">

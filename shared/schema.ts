@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, decimal, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, decimal, pgEnum, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -115,6 +115,13 @@ export const domainMappings = pgTable("domain_mappings", {
   domain: text("domain").notNull().unique(),
   verified: boolean("verified").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// User Sessions table (managed by connect-pg-simple, but included so Drizzle doesn't try to delete it)
+export const userSessions = pgTable("user_sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(), // JSON type
+  expire: timestamp("expire", { precision: 6 }).notNull(),
 });
 
 // Relations

@@ -283,14 +283,10 @@ function ProductForm({
     },
   });
 
-  // Sync variants when initialVariants change
-  useEffect(() => {
-    setVariants(initialVariants || []);
-  }, [initialVariants]);
-  
-  // Also sync when product changes
+  // Sync variants when initialVariants change or product changes
   useEffect(() => {
     if (product?.id) {
+      // Always sync with initialVariants when product exists
       setVariants(initialVariants || []);
     } else {
       setVariants([]);

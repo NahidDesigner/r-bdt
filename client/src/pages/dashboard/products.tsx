@@ -78,10 +78,11 @@ export default function ProductsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ProductFormData }) =>
       apiRequest("PATCH", `/api/products/${id}`, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      setIsDialogOpen(false);
-      setEditingProduct(null);
+      // Refetch variants after product update
+      queryClient.invalidateQueries({ queryKey: ["/api/products", variables.id, "variants"] });
+      // Don't close dialog - keep it open so user can see variants
       toast({ title: "Product updated", description: "Your product has been updated successfully." });
     },
     onError: (error: Error) => {

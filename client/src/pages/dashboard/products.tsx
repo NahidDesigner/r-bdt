@@ -337,9 +337,22 @@ function ProductForm({
       const newVariant = await res.json();
       variantForm.reset();
       setShowVariantForm(false);
-      // Invalidate and refetch variants - the useEffect will update the state
-      await queryClient.invalidateQueries({ queryKey: ["/api/products", product.id, "variants"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/products", product.id, "variants"] });
+      
+      // Invalidate and refetch variants
+      queryClient.invalidateQueries({ queryKey: ["/api/products", product.id, "variants"] });
+      // Refetch and get the updated data
+      const refetchResult = await queryClient.refetchQueries({ 
+        queryKey: ["/api/products", product.id, "variants"] 
+      });
+      
+      // Update local state immediately with the refetched data
+      if (refetchResult && refetchResult.length > 0 && refetchResult[0].data) {
+        const updatedVariants = refetchResult[0].data as ProductVariant[];
+        setVariants(updatedVariants);
+      } else {
+        // Fallback: add the new variant to local state
+        setVariants([...variants, newVariant]);
+      }
       
       // Update product to mark it as having variants
       if (!product.hasVariants) {

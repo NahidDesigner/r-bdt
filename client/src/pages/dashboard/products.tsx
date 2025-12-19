@@ -276,9 +276,7 @@ function ProductForm({
 
   // Sync variants when initialVariants change
   useEffect(() => {
-    if (initialVariants.length > 0) {
-      setVariants(initialVariants);
-    }
+    setVariants(initialVariants);
   }, [initialVariants]);
 
   const generateSlug = () => {
